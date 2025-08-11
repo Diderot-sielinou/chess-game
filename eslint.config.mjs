@@ -9,6 +9,8 @@ import tsPlugin from '@typescript-eslint/eslint-plugin';
 
 export default [
   {
+    files: ['**/*.ts'], // ✅ ici on dit quels fichiers on veut lint
+
     ignores: [
       'eslint.config.mjs',
       'node_modules/**',
