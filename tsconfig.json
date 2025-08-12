@@ -18,5 +18,6 @@
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false
   },
-  "include": ["src/**/*", "jest.config.js", "test/**/*"]
+  "include": ["src/**/*", "jest.config.js", "test/**/*"],
+  "types": ["node"]
 }
