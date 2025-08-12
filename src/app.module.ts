@@ -4,13 +4,11 @@ import { AppService } from './app.service';
 import { MyLoggerModule } from './modules/my-logger/my-logger.module';
 import { MongooseModule } from '@nestjs/mongoose';
 
-import { ConfigModule } from '@nestjs/config';
 import { AppConfigModule } from './config/config.module';
 import { AppConfigService } from './config/config.service';
 
 @Module({
   imports: [
-    ConfigModule.forRoot(),
     MongooseModule.forRootAsync({
       imports: [AppConfigModule],
       inject: [AppConfigService],
