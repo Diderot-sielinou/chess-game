@@ -6,6 +6,8 @@ import { MongooseModule } from '@nestjs/mongoose';
 
 import { AppConfigModule } from './config/config.module';
 import { AppConfigService } from './config/config.service';
+import { AuthModule } from './modules/auth/auth.module';
+import { UserModule } from './modules/user/user.module';
 
 @Module({
   imports: [
@@ -14,9 +16,14 @@ import { AppConfigService } from './config/config.service';
       inject: [AppConfigService],
       useFactory: (configService: AppConfigService) => ({
         uri: configService.DATABASE_URL,
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+        serverSelectionTimeoutMS: 5000, // timeout 5s
       }),
     }),
     MyLoggerModule,
+    AuthModule,
+    UserModule,
   ],
   controllers: [AppController],
   providers: [AppService],
