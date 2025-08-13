@@ -14,9 +14,8 @@ async function bootstrap() {
 
   logger.log('Starting backend application...');
 
-  // Activer CORS (configurable selon ton besoin)
   app.enableCors({
-    origin: '*', // Remplace par tes domaines autorisés en prod
+    origin: '*',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });

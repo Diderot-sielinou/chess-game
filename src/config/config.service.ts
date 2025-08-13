@@ -9,4 +9,18 @@ export class AppConfigService {
   get DATABASE_URL(): string | undefined {
     return this.config.get<string>('DATABASE_URL');
   }
+
+  get jwtSecret(): string | undefined {
+    return this.config.get<string>('JWT_SECRET');
+  }
+
+  get jwtExpiresIn(): string | undefined {
+    return this.config.get<string>('JWT_ACCESS_TOKEN_EXPIRATION');
+  }
+  get emailUser(): string | undefined {
+    return this.config.get<string>('EMAIL_USER');
+  }
+  get emailPassword(): string | undefined {
+    return this.config.get<string>('EMAIL_PASSWORD');
+  }
 }
