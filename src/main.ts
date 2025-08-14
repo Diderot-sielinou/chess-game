@@ -14,11 +14,13 @@ async function bootstrap() {
 
   logger.log('Starting backend application...');
 
-  app.enableCors({
-    origin: '*',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true,
-  });
+  app.enableCors({ origin: true, credentials: true });
+
+  // app.enableCors({
+  //   origin: '*',
+  //   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  //   credentials: true,
+  // });
 
   // Middleware cookie-parser (pour gérer les cookies)
   app.use(cookieParser());

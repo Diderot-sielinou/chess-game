@@ -23,4 +23,11 @@ export class AppConfigService {
   get emailPassword(): string | undefined {
     return this.config.get<string>('EMAIL_PASSWORD');
   }
+  get deepseekApiKey(): string | undefined {
+    return this.config.get<string>('DEEPSEEK_API_KEY');
+  }
+
+  get deepseekUrl(): string | undefined {
+    return this.config.get<string>('DEEPSEEK_API_URL');
+  }
 }

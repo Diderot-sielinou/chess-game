@@ -8,6 +8,8 @@ import { AppConfigModule } from './config/config.module';
 import { AppConfigService } from './config/config.service';
 import { AuthModule } from './modules/auth/auth.module';
 import { UserModule } from './modules/user/user.module';
+import { AiModule } from './modules/ai/ai.module';
+import { RedisModule } from './infa/redis.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { UserModule } from './modules/user/user.module';
     MyLoggerModule,
     AuthModule,
     UserModule,
+    AiModule,
+    RedisModule,
   ],
   controllers: [AppController],
   providers: [AppService],
