@@ -24,6 +24,7 @@ export class DeepSeekClient {
     };
 
     const { data } = await axios.post(url, payload, { headers, timeout: 20000 });
+    console.log(`reounse de l'ai 🚀  🚀 🚀  ${JSON.stringify(data)}`);
     const text =
       data?.choices?.[0]?.message?.content ?? data?.choices?.[0]?.text ?? JSON.stringify(data);
     return typeof text === 'string' ? text : JSON.stringify(text);
