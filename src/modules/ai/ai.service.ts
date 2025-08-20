@@ -11,7 +11,9 @@ import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 import Redis from 'ioredis';
 import { Chess } from 'chess.js';
-import { DeepSeekClient } from './llm.client';
+// import { DeepSeekClient } from './llm.client';
+import { GeminiClient } from './llm.client';
+
 import { movePrompt, suggestionsPrompt } from './prompts';
 import { LlmMoveResponse, LlmSuggestionsResponse } from './types';
 import { GenerateMoveDto } from './dto/generate-move.dto';
@@ -22,7 +24,7 @@ import { MyLoggerService } from '../my-logger/my-logger.service';
 
 @Injectable()
 export class AiService {
-  private ds: DeepSeekClient;
+  private ds: GeminiClient;
 
   constructor(
     private configService: AppConfigService,
@@ -31,12 +33,7 @@ export class AiService {
     @InjectModel(GameSchemaName) private readonly gameModel: Model<IGame>,
     @InjectModel(MoveSchemaName) private readonly moveModel: Model<IMove>,
   ) {
-    const key = configService.deepseekApiKey || '';
-    const baseUrl = configService.deepseekUrl;
-    this.ds = new DeepSeekClient(key, baseUrl);
-    if (!key) {
-      console.warn('[AI] DEEPSEEK_API_KEY not set — DeepSeek calls will fail.');
-    }
+    this.ds = new GeminiClient();
   }
 
   private async getLastMoves(gameId: string, limit = 10): Promise<string[]> {
@@ -127,10 +124,11 @@ export class AiService {
   async suggestMoves(dto: SuggestMovesDto): Promise<LlmSuggestionsResponse> {
     const { gameId, playerId, suggestionsCount = 3, style = 'balanced' } = dto;
     const game = await this.gameModel.findById(gameId).lean();
+    this.logger.log(`game trouver ${JSON.stringify(game)}`);
     if (!game) throw new NotFoundException('Game not found');
 
     const { chess, legalSan, legalUci } = this.computeLegalMoves(game.fen);
-    this.assertPlayersTurn(chess, game, playerId);
+    this.assertPlayersTurn(chess, game, playerId as string);
 
     const lastMoves = await this.getLastMoves(gameId, 10);
     const cacheKey = `llm:sugg:${game.fen}${gameId}:n:${suggestionsCount}:style:${style}`;
@@ -144,6 +142,8 @@ export class AiService {
       count: suggestionsCount,
       style,
     });
+
+    this.logger.log(`PROMPT genere pour la demande de suggestion a l'IA ${prompt}`);
 
     const text = await this.ds.complete(prompt);
     const parsed = this.parseJson<LlmSuggestionsResponse>(text, { suggestions: [] });

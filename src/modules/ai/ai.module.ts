@@ -7,6 +7,7 @@ import { AuthModule } from '../auth/auth.module';
 import { GameSchema, GameSchemaName, MoveSchema, MoveSchemaName } from 'src/models';
 import { MongooseModule } from '@nestjs/mongoose';
 import { RedisModule } from 'src/infa/redis.module';
+import { GeminiClient } from './llm.client';
 
 @Module({
   imports: [
@@ -19,7 +20,7 @@ import { RedisModule } from 'src/infa/redis.module';
     AuthModule,
     RedisModule,
   ],
-  providers: [AiService],
+  providers: [AiService, GeminiClient],
   controllers: [AiController],
   exports: [AiService],
 })
