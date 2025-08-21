@@ -15,6 +15,7 @@ import { Types } from 'mongoose';
 import { AiService } from '../ai/ai.service';
 import { UserService } from '../user/user.service';
 import { MyLoggerService } from '../my-logger/my-logger.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class GameService {
@@ -24,7 +25,7 @@ export class GameService {
     @InjectModel(UserSchemaName) private readonly userModel: Model<IUser>,
     private readonly aiService: AiService,
     private readonly userService: UserService,
-    // private readonly gameGateway: GameGateway,
+    private readonly eventEmitter: EventEmitter2,
     private readonly logger: MyLoggerService,
   ) {}
 
@@ -137,6 +138,25 @@ export class GameService {
     game.moves.push(moveDoc._id as Types.ObjectId);
     game.fen = chess.fen();
     game.pgn = chess.pgn();
+
+    // Determine next player turn
+    const nextTurnColor1 = chess.turn();
+    const nextPlayerId =
+      nextTurnColor1 === 'w' ? String(game.whitePlayer) : String(game.blackPlayer);
+
+    // Update game turn
+    game.turn = nextPlayerId;
+    await game.save();
+
+    // Émettre un événement pour notifier l’adversaire
+    if (nextPlayerId !== 'AI' && nextPlayerId !== playerId) {
+      this.eventEmitter.emit('game.nextTurn', {
+        gameId: game._id,
+        nextPlayerId,
+        lastMove: moveDoc.toObject(),
+        game: game.toObject(),
+      });
+    }
 
     // Check game over
     // ==================== GAME OVER HANDLING ====================
@@ -284,12 +304,11 @@ export class GameService {
 
     // ==================== WebSocket notification ====================
     if (winnerId !== 'AI') {
-      // Assumes GameGateway is injected
-      // this.gameGateway.server.to(gameId).emit('playerResigned', {
-      //   message: `Your opponent has resigned the game.`,
-      //   winner: winnerId,
-      //   gameId,
-      // });
+      this.eventEmitter.emit('game.playerResigned', {
+        gameId,
+        winnerId,
+        playerId,
+      });
     }
 
     return game.toObject();

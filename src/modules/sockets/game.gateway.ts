@@ -13,6 +13,7 @@ import { AiService } from '../ai/ai.service';
 import { GameService } from '../game/game.service';
 import { UseGuards, HttpException } from '@nestjs/common';
 import { WsAuthGuard } from '../auth/guards/ws-auth.guard';
+import { OnEvent } from '@nestjs/event-emitter';
 
 @WebSocketGateway({
   cors: {
@@ -52,6 +53,29 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         userId: client.data.userId,
         message: 'A player has disconnected.',
       });
+    });
+  }
+
+  @OnEvent('game.playerResigned')
+  handlePlayerResigned(payload: { gameId: string; winnerId: string; playerId: string }) {
+    const opponentId = payload.playerId === payload.winnerId ? null : payload.playerId;
+
+    if (opponentId) {
+      this.server.to(opponentId.toString()).emit('playerResigned', {
+        message: `Your opponent has resigned the game.`,
+        winner: payload.winnerId,
+        gameId: payload.gameId,
+      });
+    }
+  }
+
+  @OnEvent('game.nextTurn')
+  handleNextTurn(payload: { gameId: string; nextPlayerId: string; lastMove: any; game: any }) {
+    this.server.to(payload.nextPlayerId.toString()).emit('yourTurn', {
+      gameId: payload.gameId,
+      lastMove: payload.lastMove,
+      game: payload.game,
+      message: "It's your turn!",
     });
   }
 

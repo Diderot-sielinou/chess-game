@@ -15,8 +15,7 @@ import {
 } from 'src/models';
 import { AiModule } from '../ai/ai.module';
 import { UserModule } from '../user/user.module';
-// import { SocketsModule } from '../sockets/sockets.module';
-
+import { EventEmitterModule } from '@nestjs/event-emitter';
 @Module({
   imports: [
     MongooseModule.forFeature([
@@ -30,7 +29,7 @@ import { UserModule } from '../user/user.module';
     AppConfigModule,
     AiModule,
     UserModule,
-    // forwardRef(() => SocketsModule),
+    EventEmitterModule.forRoot(),
   ],
   providers: [GameService],
   controllers: [GameController],

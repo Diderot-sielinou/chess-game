@@ -12,13 +12,13 @@ socket.on('connect', () => {
   console.log('Connected with id:', socket.id);
 
   // Exemple : rejoindre une partie
-  socket.emit('joinGame', { gameId: '68a5a7fd35953ffee839a7e6' });
+  socket.emit('joinGame', { gameId: '68a6645a50bd3d0d9dddd9ee' });
 
   // Exemple : faire un move
-  socket.emit('makeMove', { gameId: '68a5a7fd35953ffee839a7e6', move: 'e2e4' });
+  socket.emit('makeMove', { gameId: '68a6645a50bd3d0d9dddd9ee', move: 'e2e4' });
 
   // Exemple : demander une suggestion
-  socket.emit('getSuggestion', { gameId: '68a5a7fd35953ffee839a7e6' });
+  socket.emit('getSuggestion', { gameId: '68a6645a50bd3d0d9dddd9ee' });
 });
 
 // Écouter les events du serveur

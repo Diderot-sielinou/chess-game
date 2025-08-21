@@ -10,6 +10,7 @@ export interface IGame extends Document {
   status: 'pending' | 'active' | 'checkmate' | 'stalemate' | 'draw' | 'resigned';
   fen: string;
   pgn?: string;
+  turn?: Types.ObjectId | string; // nouveau champ
   winner?: Types.ObjectId | string;
   moves: Types.ObjectId[];
   createdAt: Date;
@@ -29,6 +30,7 @@ export const GameSchema = new Schema<IGame>({
   },
   fen: { type: String, required: true },
   pgn: String,
+  turn: { type: Schema.Types.Mixed, ref: 'User', default: null },
   winner: { type: Schema.Types.Mixed, ref: 'User' },
   moves: [{ type: Schema.Types.ObjectId, ref: 'Move' }],
   createdAt: { type: Date, default: Date.now },

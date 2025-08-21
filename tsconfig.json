@@ -19,5 +19,5 @@
     "noFallthroughCasesInSwitch": false,
     "types": ["node", "jest"]
   },
-  "include": ["src/**/*", "jest.config.js", "test-gateway.ts", "test/**/*"]
+  "include": ["src/**/*", "jest.config.js", "test-gateway.ts", "test-matchmaking.ts", "test/**/*"]
 }
