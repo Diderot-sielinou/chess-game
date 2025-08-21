@@ -4,7 +4,7 @@ import { IsNotEmpty, IsString } from 'class-validator';
 export class VerifyOtpDto {
   @IsNotEmpty()
   @IsString()
-  userIdentifier: string;
+  email: string;
 
   @IsNotEmpty()
   @IsString()

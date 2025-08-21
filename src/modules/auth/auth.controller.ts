@@ -14,15 +14,14 @@ export class AuthController {
   @Post('request-otp')
   async requestOtp(@Body() body: RequestOtpDto) {
     const userIdentifier = body.email;
-    if (!userIdentifier) {
-      throwHttpError(ErrorCode.BAD_REQUEST, { message: ' Email is required' });
-    }
+    if (!userIdentifier) throwHttpError(ErrorCode.BAD_REQUEST, { message: 'Email is required' });
+
     await this.authService.requestOTP(userIdentifier);
-    return { message: 'OTP send' };
+    return { message: 'OTP send', userIdentifier }; // <-- return userIdentifier
   }
 
   @Post('verify-otp')
   async verifyOtp(@Body() body: VerifyOtpDto) {
-    return await this.authService.verifyOTP(body.userIdentifier, body.code);
+    return await this.authService.verifyOTP(body.email, body.code);
   }
 }

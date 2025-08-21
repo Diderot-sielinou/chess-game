@@ -27,7 +27,7 @@ export class EmailService {
         subject: subject, // sujet de l'email
         text: text,
       });
-      console.log(`✅ send to ${to}`);
+      // console.log(`✅ send to ${to}`);
     } catch (error) {
       console.error("❌ Erreur lors de l'envoi de l'email:", error);
       throw new Error('Unable to send email');
