@@ -4,23 +4,21 @@ import { MyLoggerService } from './modules/my-logger/my-logger.service';
 import { AllExceptionsFilter } from './common/filter/all-exceptions.filter';
 import * as cookieParser from 'cookie-parser';
 import { ValidationPipe } from '@nestjs/common';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 
 async function bootstrap() {
   const logger = new MyLoggerService();
 
   const app = await NestFactory.create(AppModule, { logger });
+  app.useWebSocketAdapter(new IoAdapter(app));
 
   app.enableShutdownHooks();
 
   logger.log('Starting backend application...');
 
-  app.enableCors({ origin: true, credentials: true });
-
-  // app.enableCors({
-  //   origin: '*',
-  //   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  //   credentials: true,
-  // });
+  // Configuration CORS de l'application principale
+  // Supprimez cette ligne pour éviter les conflits avec la passerelle
+  // app.enableCors({ origin: true, credentials: true });
 
   // Middleware cookie-parser (pour gérer les cookies)
   app.use(cookieParser());

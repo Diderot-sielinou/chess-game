@@ -1,17 +1,18 @@
 // src/models/game.schema.ts
 import mongoose, { Schema } from 'mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 // Interface pour le document de jeu
 export interface IGame extends Document {
-  players: mongoose.Schema.Types.ObjectId[];
-  whitePlayer: mongoose.Schema.Types.ObjectId;
-  blackPlayer: mongoose.Schema.Types.ObjectId;
+  players: (Types.ObjectId | string)[];
+  whitePlayer: Types.ObjectId | string;
+  blackPlayer: Types.ObjectId | string;
   status: 'pending' | 'active' | 'checkmate' | 'stalemate' | 'draw' | 'resigned';
   fen: string;
   pgn?: string;
-  winner?: mongoose.Schema.Types.ObjectId;
-  moves: mongoose.Schema.Types.ObjectId[];
+  turn?: Types.ObjectId | string; // nouveau champ
+  winner?: Types.ObjectId | string;
+  moves: Types.ObjectId[];
   createdAt: Date;
   startedAt?: Date;
   endedAt?: Date;
@@ -19,9 +20,9 @@ export interface IGame extends Document {
 }
 
 export const GameSchema = new Schema<IGame>({
-  players: [{ type: Schema.Types.ObjectId, ref: 'User' }],
-  whitePlayer: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  blackPlayer: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  players: [{ type: Schema.Types.Mixed, ref: 'User' }], // Mixed accepte ObjectId et String
+  whitePlayer: { type: Schema.Types.Mixed, ref: 'User' },
+  blackPlayer: { type: Schema.Types.Mixed, ref: 'User' },
   status: {
     type: String,
     enum: ['pending', 'active', 'checkmate', 'stalemate', 'draw', 'resigned'],
@@ -29,7 +30,8 @@ export const GameSchema = new Schema<IGame>({
   },
   fen: { type: String, required: true },
   pgn: String,
-  winner: { type: Schema.Types.ObjectId, ref: 'User' },
+  turn: { type: Schema.Types.Mixed, ref: 'User', default: null },
+  winner: { type: Schema.Types.Mixed, ref: 'User' },
   moves: [{ type: Schema.Types.ObjectId, ref: 'Move' }],
   createdAt: { type: Date, default: Date.now },
   startedAt: Date,
