@@ -21,7 +21,7 @@ import { MatchmakingModule } from './modules/matchmaking/matchmaking.module';
       inject: [AppConfigService],
       useFactory: (configService: AppConfigService) => ({
         uri: configService.LOCAL_DATABASE,
-        serverSelectionTimeoutMS: 7000, // timeout 5s
+        serverSelectionTimeoutMS: 5000, // timeout 5s
       }),
     }),
     MyLoggerModule,

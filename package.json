@@ -45,6 +45,7 @@
     "class-validator": "^0.14.2",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.2.1",
+    "expo": "^53.0.20",
     "ioredis": "^5.7.0",
     "joi": "^18.0.0",
     "mongoose": "^8.17.1",

@@ -11,7 +11,7 @@ export class AppConfigService {
   }
 
   get LOCAL_DATABASE(): string | undefined {
-    return this.config.get<string>('MONGODB_URI');
+    return this.config.get<string>('DATABASE_URL');
   }
 
   get jwtSecret(): string | undefined {

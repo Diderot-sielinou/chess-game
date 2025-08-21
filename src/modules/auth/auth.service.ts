@@ -70,7 +70,7 @@ export class AuthService {
       this.logger.log(`creation of user ${email} in the database`);
       user = await this.userModel.create({
         displayName: `User_${crypto.randomBytes(3).toString('hex')}`,
-        // phone: /^\d+$/.test(email) ? email : undefined,
+        phone: /^\d+$/.test(email) ? email : undefined,
         email: /@/.test(email) ? email : undefined,
       });
     }
