@@ -25,29 +25,31 @@ export class AuthService {
     private readonly emailService: EmailService,
   ) {}
 
-  async requestOTP(userIdentifier: string): Promise<void> {
+  async requestOTP(email: string): Promise<void> {
     const otpCode = ('' + Math.floor(100000 + Math.random() * 900000)).slice(0, 6);
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-    await this.otpSessionModel.deleteMany({ userIdentifier });
+    await this.otpSessionModel.deleteMany({ userIdentifier: email });
 
     await this.otpSessionModel.create({
-      userIdentifier,
+      userIdentifier: email,
       otpCode,
       expiresAt,
       attempts: 0,
     });
 
     await this.emailService.sendMail(
-      userIdentifier,
+      email,
       'Your OTP code',
       `Your OTP code is : ${otpCode}\nIl will expire in 5 minutes.`,
     );
-    this.logger.log(`OTP send at ${userIdentifier}: ${otpCode}`);
+    this.logger.log(`OTP send at ${email}: ${otpCode}`);
   }
 
-  async verifyOTP(userIdentifier: string, code: string) {
-    const session = await this.otpSessionModel.findOne({ userIdentifier }).sort({ expiresAt: -1 });
+  async verifyOTP(email: string, code: string) {
+    const session = await this.otpSessionModel
+      .findOne({ userIdentifier: email })
+      .sort({ expiresAt: -1 });
 
     if (!session) throwHttpError(ErrorCode.OTP_INVALID);
     if (session.expiresAt < new Date()) throwHttpError(ErrorCode.OTP_EXPIRED);
@@ -55,21 +57,21 @@ export class AuthService {
 
     if (session.otpCode !== code) {
       session.attempts++;
-      this.logger.log(`using ${userIdentifier} trying to log in with an incorrect OTP`);
+      this.logger.log(`using ${email} trying to log in with an incorrect OTP`);
       await session.save();
       throwHttpError(ErrorCode.OTP_INVALID);
     }
 
     let user = await this.userModel.findOne({
-      $or: [{ email: userIdentifier }],
+      $or: [{ email }],
     });
 
     if (!user) {
-      this.logger.log(`creation of user ${userIdentifier} in the database`);
+      this.logger.log(`creation of user ${email} in the database`);
       user = await this.userModel.create({
         displayName: `User_${crypto.randomBytes(3).toString('hex')}`,
-        phone: /^\d+$/.test(userIdentifier) ? userIdentifier : undefined,
-        email: /@/.test(userIdentifier) ? userIdentifier : undefined,
+        // phone: /^\d+$/.test(email) ? email : undefined,
+        email: /@/.test(email) ? email : undefined,
       });
     }
 
@@ -77,9 +79,7 @@ export class AuthService {
     const accessToken = this.jwtService.sign(payload);
 
     await this.otpSessionModel.deleteOne({ _id: session._id });
-    this.logger.log(
-      `delete the otp session and generate the accesToken for the user ${userIdentifier}`,
-    );
+    this.logger.log(`delete the otp session and generate the accesToken for the user ${email}`);
 
     return { accessToken, user };
   }

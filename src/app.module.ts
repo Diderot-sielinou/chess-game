@@ -18,8 +18,6 @@ import { RedisModule } from './infa/redis.module';
       inject: [AppConfigService],
       useFactory: (configService: AppConfigService) => ({
         uri: configService.DATABASE_URL,
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
         serverSelectionTimeoutMS: 5000, // timeout 5s
       }),
     }),
