@@ -30,7 +30,6 @@ export class AiController {
   @Post('suggest-moves')
   async suggestMoves(@Body() dto: SuggestMovesDto, @Req() req) {
     const playerId = req.user.userId; // Récupérez l'ID du joueur depuis le token
-    // const playerId = 'mockPlayerId'; // Temporaire pour les tests
     const res = await this.aiService.suggestMoves({ ...dto, playerId });
     return res; // { suggestions, explanations? }
   }

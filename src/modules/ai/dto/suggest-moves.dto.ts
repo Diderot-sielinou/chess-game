@@ -6,7 +6,8 @@ export class SuggestMovesDto {
   gameId: string;
 
   @IsString()
-  playerId: string; // Ajouté pour validation côté serveur
+  @IsOptional()
+  playerId?: string;
 
   @IsOptional()
   @IsNumber()
