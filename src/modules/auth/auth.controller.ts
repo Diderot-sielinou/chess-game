@@ -22,6 +22,6 @@ export class AuthController {
 
   @Post('verify-otp')
   async verifyOtp(@Body() body: VerifyOtpDto) {
-    return await this.authService.verifyOTP(body.email, body.code);
+    return await this.authService.verifyOTP(body.userIdentifier, body.code);
   }
 }
