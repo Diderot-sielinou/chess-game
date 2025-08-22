@@ -16,8 +16,6 @@ async function bootstrap() {
 
   logger.log('Starting backend application...');
 
-  // Configuration CORS de l'application principale
-  // Supprimez cette ligne pour éviter les conflits avec la passerelle
   // app.enableCors({ origin: true, credentials: true });
 
   // Middleware cookie-parser (pour gérer les cookies)
