@@ -19,10 +19,13 @@ import { MatchmakingModule } from './modules/matchmaking/matchmaking.module';
     MongooseModule.forRootAsync({
       imports: [AppConfigModule],
       inject: [AppConfigService],
-      useFactory: (configService: AppConfigService) => ({
-        uri: configService.LOCAL_DATABASE,
-        serverSelectionTimeoutMS: 5000, // timeout 5s
-      }),
+      useFactory: (configService: AppConfigService) => {
+        console.log('DB URL from config:', configService.DATABASE_URL);
+        return {
+          uri: configService.DATABASE_URL,
+          serverSelectionTimeoutMS: 5000,
+        };
+      },
     }),
     MyLoggerModule,
     AuthModule,
