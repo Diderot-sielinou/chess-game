@@ -60,7 +60,6 @@ export class GameService {
   async playMove(gameId: string, playerId: string, moveStr: string, promotion?: string) {
     const game = await this.gameModel.findById(gameId);
     if (!game) throw new NotFoundException('Game not found');
-
     // Check game status
     if (['checkmate', 'stalemate', 'draw', 'resigned'].includes(game.status)) {
       throw new BadRequestException('Game already finished');
