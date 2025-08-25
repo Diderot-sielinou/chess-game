@@ -16,7 +16,8 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": false,
     "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
+    "noFallthroughCasesInSwitch": false,
+    "types": ["node", "jest"]
   },
-  "include": ["src/**/*", "jest.config.js", "test/**/*"]
+  "include": ["src/**/*", "jest.config.js", "test-gateway.ts", "test-matchmaking.ts", "test/**/*"]
 }
