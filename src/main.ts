@@ -16,7 +16,7 @@ async function bootstrap() {
 
   logger.log('Starting backend application...');
 
-  // app.enableCors({ origin: true, credentials: true });
+  app.enableCors({ origin: true, credentials: true });
 
   // Middleware cookie-parser (pour gérer les cookies)
   app.use(cookieParser());
