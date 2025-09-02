@@ -29,7 +29,7 @@ export class UserController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async getCurrentUser(@Req() req: JwtAuthRequest) {
-    // console.log('Payload JWT reçu :', req.user);
+    console.log('Payload JWT reçu fetche me :', req.user);
 
     if (!req.user?.userId) {
       throw new NotFoundException('JWT invalide : userId manquant');

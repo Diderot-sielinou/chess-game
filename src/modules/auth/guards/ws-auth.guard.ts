@@ -24,6 +24,7 @@ export class WsAuthGuard implements CanActivate {
     try {
       // Vérifie et décode le token
       const payload = this.jwtService.verify(token as string);
+      console.log(`payload : ${JSON.stringify(payload)}`);
       client.data.userId = payload.sub; // On stocke l'ID utilisateur
       return true;
     } catch (err) {

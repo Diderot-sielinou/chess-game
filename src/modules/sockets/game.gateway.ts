@@ -14,6 +14,7 @@ import { GameService } from '../game/game.service';
 import { UseGuards, HttpException } from '@nestjs/common';
 import { WsAuthGuard } from '../auth/guards/ws-auth.guard';
 import { OnEvent } from '@nestjs/event-emitter';
+import { MatchmakingService } from '../matchmaking/matchmaking.service';
 
 @WebSocketGateway({
   cors: {
@@ -32,11 +33,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly gamesService: GameService,
     private readonly aiService: AiService,
+    private readonly matchmakingService: MatchmakingService,
   ) {}
 
   // ✅ Quand un joueur se connecte
   handleConnection(@ConnectedSocket() client: Socket) {
-    // 🔐 Ton WsAuthGuard met normalement userId dans client.data.userId
+    // 🔐  WsAuthGuard met normalement userId dans client.data.userId
     console.log(`Client connected: ${client.id}, userId: ${client.data.userId}`);
 
     // ✅ Room privée par utilisateur : permet d’émettre à un joueur précis
@@ -82,6 +84,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('joinGame')
   async handleJoinGame(@MessageBody() body: { gameId: string }, @ConnectedSocket() client: Socket) {
     try {
+      console.log('user joinGame', body.gameId);
       await client.join(body.gameId);
       client.emit('joined', {
         message: `You have joined the game as ${client.data.userId}.`,
@@ -113,6 +116,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (game.status !== 'active') {
         const result = game.status;
         this.server.to(body.gameId).emit('gameOver', {
+          game,
           gameId: body.gameId,
           result: result,
           winner: game.winner,
@@ -140,6 +144,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         client.emit('error', { message: 'Game not found.' });
         return;
       }
+      console.log(`demande de suggestion au backend ${JSON.stringify(game)}`);
 
       const isWhitePlayer = String(game.whitePlayer) === client.data.userId;
       const isBlackPlayer = String(game.blackPlayer) === client.data.userId;
@@ -156,12 +161,52 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       };
 
       const suggestions = await this.aiService.suggestMoves(suggestionDto);
+      console.log(`reponse du backend de suggestion ${JSON.stringify(suggestions)}`);
+
       client.emit('suggestionReceived', { suggestions });
     } catch (error) {
       console.error('Error when requesting suggestion:', error);
       client.emit('error', {
         message: 'An error occurred when requesting suggestion.',
       });
+    }
+  }
+
+  @SubscribeMessage('joinQueue')
+  async handleJoinQueue(client: Socket, payload: { timeControl: string }) {
+    const game = await this.matchmakingService.enqueue(client.id, payload.timeControl);
+    if (game) {
+      this.server.to(String(game.whitePlayer)).emit('matchFound', game);
+      this.server.to(String(game.blackPlayer)).emit('matchFound', game);
+    } else {
+      this.server
+        .to(String(client.data.userId))
+        .emit('Waiting', { message: 'Waiting for another player...' });
+    }
+  }
+
+  @SubscribeMessage('createVsAI')
+  async handleCreateVsAI(client: Socket, payload: { timeControl: string }) {
+    console.log(`partir contre l'ia creer par socket`);
+    const game = await this.gamesService.createGame({
+      whitePlayer: client.data.userId,
+      blackPlayer: 'AI',
+      timeControl: payload.timeControl,
+    });
+    console.log(`partir contre l'ia creer par socket ${JSON.stringify(game)}`);
+
+    // client.join(game._id.toString());
+    client.emit('aiGameCreated', game);
+  }
+
+  @SubscribeMessage('resign')
+  async handleResign(@MessageBody() body: { gameId: string }, @ConnectedSocket() client: Socket) {
+    try {
+      const result = await this.gamesService.resign(body.gameId, client.data.userId as string);
+      console.log(`player ${client.data.userId} resign parti `);
+    } catch (error) {
+      console.error('Error resigning game:', error);
+      client.emit('error', { message: 'An error occurred while resigning the game.' });
     }
   }
 }

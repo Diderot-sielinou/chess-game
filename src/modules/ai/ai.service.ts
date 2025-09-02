@@ -99,6 +99,7 @@ export class AiService {
     if (cached)
       return this.parseJson<LlmMoveResponse>(cached, { move: '', explanation: 'cache fallback' });
 
+    // Demande au LLM
     const prompt = movePrompt({
       fen: game.fen,
       legalMoves: [...legalSan, ...legalUci],
@@ -108,18 +109,65 @@ export class AiService {
     const text = await this.ds.complete(prompt);
     const parsed = this.parseJson<LlmMoveResponse>(text, { move: '' });
 
+    // Vérifie si le coup est légal
     const moveIsLegal =
       parsed.move && (legalSan.includes(parsed.move) || legalUci.includes(parsed.move));
-    if (!parsed.move || !moveIsLegal) {
-      throw new BadRequestException('LLM returned an invalid shot');
+
+    let applied: any = null;
+    if (moveIsLegal) {
+      applied = chess.move(parsed.move) || chess.move(this.sanFromUci(chess, parsed.move));
     }
 
-    const applied = chess.move(parsed.move) || chess.move(this.sanFromUci(chess, parsed.move));
-    if (!applied) throw new BadRequestException('Invalid move after validation');
+    // ⚡️ Fallback : si l’IA échoue, choisir un coup aléatoire parmi legalUci
+    if (!applied) {
+      this.logger.warn(`⚠️ LLM move invalid → fallback to random legal move`);
+      const randomMove = legalUci[Math.floor(Math.random() * legalUci.length)];
+      applied = chess.move(randomMove);
+      parsed.move = randomMove;
+      parsed.explanation = 'Fallback random legal move';
+    }
 
     await this.redis.set(cacheKey, JSON.stringify(parsed), 'EX', 60 * 60 * 6);
     return parsed;
   }
+
+  // async generateMove(dto: GenerateMoveDto): Promise<LlmMoveResponse> {
+  //   const { gameId, difficulty = 'medium' } = dto;
+  //   const game = await this.gameModel.findById(gameId).lean();
+  //   if (!game) throw new NotFoundException('Game not found');
+
+  //   const { chess, legalSan, legalUci } = this.computeLegalMoves(game.fen);
+  //   if (game.status !== 'active') {
+  //     throw new BadRequestException('The game is not active');
+  //   }
+
+  //   const lastMoves = await this.getLastMoves(gameId, 10);
+  //   const cacheKey = `llm:move:${game.fen}${gameId}:d:${difficulty}`;
+  //   const cached = await this.redis.get(cacheKey);
+  //   if (cached)
+  //     return this.parseJson<LlmMoveResponse>(cached, { move: '', explanation: 'cache fallback' });
+
+  //   const prompt = movePrompt({
+  //     fen: game.fen,
+  //     legalMoves: [...legalSan, ...legalUci],
+  //     lastMoves,
+  //     difficulty,
+  //   });
+  //   const text = await this.ds.complete(prompt);
+  //   const parsed = this.parseJson<LlmMoveResponse>(text, { move: '' });
+
+  //   const moveIsLegal =
+  //     parsed.move && (legalSan.includes(parsed.move) || legalUci.includes(parsed.move));
+  //   if (!parsed.move || !moveIsLegal) {
+  //     throw new BadRequestException('LLM returned an invalid shot');
+  //   }
+
+  //   const applied = chess.move(parsed.move) || chess.move(this.sanFromUci(chess, parsed.move));
+  //   if (!applied) throw new BadRequestException('Invalid move after validation');
+
+  //   await this.redis.set(cacheKey, JSON.stringify(parsed), 'EX', 60 * 60 * 6);
+  //   return parsed;
+  // }
 
   async suggestMoves(dto: SuggestMovesDto): Promise<LlmSuggestionsResponse> {
     const { gameId, playerId, suggestionsCount = 3, style = 'balanced' } = dto;
