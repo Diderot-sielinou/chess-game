@@ -55,6 +55,20 @@ export class GameController {
     return this.gamesService.playMove(dto.gameId, playerId as string, dto.move, dto.promotion);
   }
 
+  @Get('my/history')
+  async getMyHistory(@Request() req, @Query() q: ListGamesDto) {
+    const userId = req.user.userId;
+    const limit = q.limit ? parseInt(q.limit, 10) : 10;
+    const skip = q.skip ? parseInt(q.skip, 10) : 0;
+
+    // fetch games where user is either white or black
+    return this.gamesService.listGames(
+      { $or: [{ whitePlayer: userId }, { blackPlayer: userId }] },
+      limit,
+      skip,
+    );
+  }
+
   @Get(':id/last-moves')
   async lastMoves(@Param('id') id: string) {
     return this.gamesService.getLastMoves(id, 10);

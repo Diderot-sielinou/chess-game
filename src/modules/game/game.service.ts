@@ -53,7 +53,14 @@ export class GameService {
   }
 
   async listGames(filter: FilterQuery<IGame> = {}, limit = 20, skip = 0) {
-    return this.gameModel.find(filter).sort({ createdAt: -1 }).limit(limit).skip(skip).lean();
+    return this.gameModel
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .populate('whitePlayer', 'displayName avatarUrl')
+      .populate('blackPlayer', 'displayName avatarUrl')
+      .limit(limit)
+      .skip(skip)
+      .lean();
   }
 
   /** Apply a move to a game: validate via chess.js, create Move doc, update game fen/pgn/status */

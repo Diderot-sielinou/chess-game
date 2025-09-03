@@ -42,6 +42,15 @@ export class UserService {
     return this.userModel.findOne({ phone }).exec();
   }
 
+  async getUserStats(userId: string) {
+    const user = await this.userModel.findById(userId).select('stats rating').exec();
+    if (!user) throw new NotFoundException('User not found');
+    return {
+      stats: user.stats,
+      rating: user.rating,
+    };
+  }
+
   async updateStatsAndRating(
     userId: string,
     result: 'win' | 'loss' | 'draw',

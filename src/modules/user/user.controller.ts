@@ -61,6 +61,12 @@ export class UserController {
     return user;
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Get('me/stats')
+  async getMyStats(@Req() req: JwtAuthRequest) {
+    return this.userService.getUserStats(req.user.userId);
+  }
+
   @Get(':id')
   async getUserPublicProfile(@Param('id') id: string) {
     const user = await this.userService.getById(id);
