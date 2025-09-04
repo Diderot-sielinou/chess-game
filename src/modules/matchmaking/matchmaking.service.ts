@@ -22,8 +22,8 @@ export class MatchmakingService {
     @Inject(forwardRef(() => GameService))
     private readonly gamesService: GameService,
     // ⚠️ on suppose que GameGateway est exporté depuis son module
-    @Inject(forwardRef(() => GameGateway))
-    private readonly gateway: GameGateway,
+    // @Inject(forwardRef(() => GameGateway))
+    // private readonly gateway: GameGateway,
   ) {}
 
   /** Joindre la file (par cadence), puis tenter un match immédiat ou fallback IA */
@@ -43,15 +43,15 @@ export class MatchmakingService {
     const game = await this.tryMatch(tc);
     if (game) {
       // 📣 Notifier chacun dans sa room privée userId
-      this.gateway.server.to(String(game.whitePlayer)).emit('matchFound', game);
-      this.gateway.server.to(String(game.blackPlayer)).emit('matchFound', game);
+      // this.gateway.server.to(String(game.whitePlayer)).emit('matchFound', game);
+      // this.gateway.server.to(String(game.blackPlayer)).emit('matchFound', game);
       return game;
     }
 
     // ⛑️ Fallback IA si attente trop longue (contrôle à l’instant T)
     const fallback = await this.tryAiFallback(player);
     if (fallback) {
-      this.gateway.server.to(String(fallback.whitePlayer)).emit('matchFound', fallback);
+      // this.gateway.server.to(String(fallback.whitePlayer)).emit('matchFound', fallback);
       return fallback;
     }
 
