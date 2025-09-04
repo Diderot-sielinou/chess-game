@@ -55,6 +55,7 @@ export class GameService {
 
   /** Applique un coup */
   async playMove(gameId: string, playerId: string, moveStr: string, promotion?: string) {
+    console.log(`appele de playMode avec move ${moveStr} playerId: ${playerId}`);
     const game = await this.gameModel.findById(gameId);
     if (!game) throw new NotFoundException('Game not found');
 
@@ -119,6 +120,10 @@ export class GameService {
       game: game.toObject(),
     });
 
+    this.logger.log(
+      `emition de l'evennement apres un coup jouer gameId ${game._id} nextPlayerId: ${game.turn}`,
+    );
+
     // Vérifier si AI doit jouer
     if (game.turn === 'AI') await this._handleAiTurn(gameId, game);
 
@@ -130,6 +135,7 @@ export class GameService {
 
   private async _handleAiTurn(gameId: string, game: any) {
     const aiMove = await this.aiService.generateMove({ gameId, difficulty: 'medium' });
+    console.log(`movement generer par l'ia ${JSON.stringify(aiMove)}}`);
     console.log(`ia move ${JSON.stringify(aiMove)}`);
     if (!aiMove?.move) {
       game.status = 'draw';
@@ -137,7 +143,15 @@ export class GameService {
       await game.save();
       return;
     }
-    await this.playMove(gameId, 'AI', aiMove.move, aiMove.promotion);
+    const result = await this.playMove(gameId, 'AI', aiMove.move, aiMove.promotion);
+    // ⚡ MAIS on émet explicitement un event IA → front
+    this.eventEmitter.emit('game.aiPlayed', {
+      gameId,
+      lastMove: result.move, // contient { from, to, fen, ... }
+      game: result.game,
+    });
+
+    this.logger.log(`♟️ IA a joué ${result.move.from} → ${result.move.to}`);
   }
 
   private async _handleGameOver(game: any, chess: Chess, lastMove: Move) {
