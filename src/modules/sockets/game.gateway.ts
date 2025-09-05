@@ -119,6 +119,27 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  @OnEvent('game.gameOver')
+  handleGameOver(payload: {
+    gameId: string;
+    result: string;
+    winnerId?: string;
+    fen: string;
+    pgn: string;
+  }) {
+    this.logger.log(`Game over event received for game ${payload.gameId}`);
+    this.server.to(payload.gameId).emit('gameOver', {
+      gameId: payload.gameId,
+      result: payload.result,
+      winner: payload.winnerId,
+      game: {
+        fen: payload.fen,
+        pgn: payload.pgn,
+        status: payload.result,
+      },
+    });
+  }
+
   @SubscribeMessage('joinGame')
   async handleJoinGame(@MessageBody() body: { gameId: string }, @ConnectedSocket() client: Socket) {
     try {
@@ -148,19 +169,19 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         body.promotion,
       );
 
-      this.server.to(body.gameId).emit('movePlayed', moveResult);
+      // this.server.to(body.gameId).emit('movePlayed', moveResult);
 
-      const game = await this.gamesService.getGame(body.gameId);
-      if (game.status !== 'active') {
-        const result = game.status;
-        this.server.to(body.gameId).emit('gameOver', {
-          game,
-          gameId: body.gameId,
-          result: result,
-          winner: game.winner,
-          statsUpdated: true,
-        });
-      }
+      // const game = await this.gamesService.getGame(body.gameId);
+      // if (game.status !== 'active') {
+      //   const result = game.status;
+      //   this.server.to(body.gameId).emit('gameOver', {
+      //     game,
+      //     gameId: body.gameId,
+      //     result: result,
+      //     winner: game.winner,
+      //     statsUpdated: true,
+      //   });
+      // }
     } catch (error) {
       if (error instanceof HttpException) {
         client.emit('error', { status: error.getStatus(), message: error.getResponse() });
@@ -212,14 +233,36 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('joinQueue')
   async handleJoinQueue(client: Socket, payload: { timeControl: string }) {
-    const game = await this.matchmakingService.enqueue(client.id, payload.timeControl);
+    console.log('call joinQueue ✅');
+
+    // ✅  Utiliser client.data.userId
+    const game = await this.matchmakingService.enqueue(client.data.userId, payload.timeControl);
+
     if (game) {
+      console.log(`game found on joinQueue ✅ ✅ ${JSON.stringify(game)}`);
+
+      // ✅  Emettre sur les rooms des joueurs (leur userId)
       this.server.to(String(game.whitePlayer)).emit('matchFound', game);
       this.server.to(String(game.blackPlayer)).emit('matchFound', game);
     } else {
+      // ✅ : Emettre le message d'attente sur la room du joueur
       this.server
         .to(String(client.data.userId))
-        .emit('Waiting', { message: 'Waiting for another player...' });
+        .emit('waiting', { message: 'Waiting for another player...' });
+    }
+  }
+
+  @OnEvent('match.found')
+  handleMatchFound(payload: { game: any; players: string[]; isAi?: boolean }) {
+    const { game, players, isAi } = payload;
+
+    if (isAi) {
+      // Si c'est un match vs IA, on émet un événement spécifique au joueur
+      this.server.to(String(players[0])).emit('aiMatchFound', game);
+    } else {
+      // Si c'est un match humain, on émet l'événement aux deux joueurs
+      this.server.to(String(game.whitePlayer)).emit('matchFound', game);
+      this.server.to(String(game.blackPlayer)).emit('matchFound', game);
     }
   }
 

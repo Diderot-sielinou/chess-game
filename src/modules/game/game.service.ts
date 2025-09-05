@@ -195,6 +195,15 @@ export class GameService {
     }
 
     await game.save();
+
+    // Exemple dans _handleGameOver
+    this.eventEmitter.emit('game.gameOver', {
+      gameId: game._id,
+      result: game.status,
+      winnerId: game.winner,
+      fen: chess.fen(),
+      pgn: chess.pgn(),
+    });
   }
 
   /** Abandon */
