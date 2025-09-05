@@ -1,3 +1,4 @@
+//update-user.dto.ts
 import { IsOptional, IsString, IsUrl } from 'class-validator';
 export class UpdateUserDto {
   @IsOptional()
@@ -5,6 +6,6 @@ export class UpdateUserDto {
   displayName?: string;
 
   @IsOptional()
-  @IsUrl()
+  @IsUrl({}, { message: 'Invalid profile Image URL.' })
   avatarUrl?: string;
 }

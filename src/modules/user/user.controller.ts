@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import {
   Controller,
   Get,
@@ -7,11 +8,16 @@ import {
   UseGuards,
   Body,
   NotFoundException,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UpdateUserDto } from './dto/dtos/update-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-
+import { FileInterceptor } from '@nestjs/platform-express';
+import { CloudinaryService } from '../../common/cloudinary/cloudinary.service'; // Import the service
+import { ImageValidationPipe } from '../../common/middleware/image-validator.pipe';
+import { MulterFile } from '../../types/multer-file';
 interface UserJwtPayload {
   userId: string; // userId
   username: string;
@@ -23,8 +29,10 @@ interface JwtAuthRequest {
 
 @Controller('user')
 export class UserController {
-  // eslint-disable-next-line no-unused-vars
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly cloudinaryService: CloudinaryService, // Inject the service
+  ) {}
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
@@ -59,6 +67,27 @@ export class UserController {
     }
 
     return user;
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('me/avatar')
+  @UseInterceptors(FileInterceptor('file')) // 'file' is the field name from the frontend
+  async uploadAvatar(
+    @Req() req: JwtAuthRequest,
+    @UploadedFile(new ImageValidationPipe()) file: MulterFile,
+  ) {
+    // 1. Upload the file to a specific folder, like 'avatars'
+    const result = await this.cloudinaryService.uploadFile(file, 'avatars');
+
+    // 2. Update the user in the database with the new URLs
+    const userId = req.user.userId;
+    return this.userService.updateAvatar(userId, result.secure_url, result.public_id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me/stats')
+  async updateStatsAndRating(@Req() req: JwtAuthRequest) {
+    return this.userService.updateStatsAndRating(req.user.userId, 'win', 0); // Example values: 'win' and 0
   }
 
   @Get(':id')
