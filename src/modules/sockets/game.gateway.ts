@@ -81,6 +81,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const opponentId = payload.playerId === payload.winnerId ? null : payload.playerId;
 
     if (opponentId) {
+      console.log(`opponentId:${opponentId} ecouter de l'evenement de playerResigned generer gameId: ${payload.gameId} game :
+      ${JSON.stringify(payload)}  `);
       this.server.to(opponentId.toString()).emit('playerResigned', {
         message: `Your opponent has resigned the game.`,
         winner: payload.winnerId,
@@ -126,9 +128,11 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     winnerId?: string;
     fen: string;
     pgn: string;
+    players: string[];
   }) {
     this.logger.log(`Game over event received for game ${payload.gameId}`);
-    this.server.to(payload.gameId).emit('gameOver', {
+
+    const eventPayload = {
       gameId: payload.gameId,
       result: payload.result,
       winner: payload.winnerId,
@@ -137,7 +141,20 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         pgn: payload.pgn,
         status: payload.result,
       },
-    });
+    };
+
+    // 1. Émettre l'événement à la room de la partie (pour les spectateurs ou si le client est encore là)
+    this.server.to(payload.gameId).emit('gameOver', eventPayload);
+
+    // 2. ✅ Émettre l'événement à la room privée de chaque joueur
+    for (const playerId of payload.players) {
+      // Si l'IA n'a pas de room, cela n'aura pas d'effet, ce qui est le comportement souhaité.
+      if (playerId !== 'AI') {
+        this.server.to(String(playerId)).emit('gameOver', eventPayload);
+      }
+    }
+
+    console.log(`gameOver winner:${payload.winnerId}`);
   }
 
   @SubscribeMessage('joinGame')
@@ -164,7 +181,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const moveResult = await this.gamesService.playMove(
         body.gameId,
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        client.data.userId, // ✅ récupéré depuis le guard
+        client.data.userId, // ✅
         body.move,
         body.promotion,
       );
@@ -282,6 +299,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('resign')
   async handleResign(@MessageBody() body: { gameId: string }, @ConnectedSocket() client: Socket) {
+    console.log(`call resign gameId ✅ ✅ ${JSON.stringify(body)}`);
+
     try {
       const result = await this.gamesService.resign(body.gameId, client.data.userId as string);
       this.logger.log(`player ${client.data.userId} resign parti `);
