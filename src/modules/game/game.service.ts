@@ -85,9 +85,7 @@ export class GameService {
       game.startedAt = new Date();
     }
 
-    const applied: Move | null = promotion
-      ? chess.move({ from: moveStr.slice(0, 2), to: moveStr.slice(2, 4), promotion })
-      : chess.move(moveStr);
+    const applied: Move | null = chess.move(moveStr);
 
     if (!applied) throw new BadRequestException('Invalid move');
 
@@ -99,7 +97,7 @@ export class GameService {
       to: applied.to,
       fen: chess.fen(),
       moveNumber: (game.moves?.length || 0) + 1,
-      promotion: applied.promotion,
+      promotion: applied.promotion, // <-- applied.promotion will be null or 'q', 'r', 'b', 'n'
     });
 
     game.moves = game.moves || [];
