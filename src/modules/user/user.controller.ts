@@ -4,11 +4,13 @@ import {
   Get,
   Patch,
   Req,
+  Post,
   Param,
   UseGuards,
   Body,
   NotFoundException,
   UseInterceptors,
+  BadRequestException,
   UploadedFile,
 } from '@nestjs/common';
 import { UserService } from './user.service';
@@ -69,21 +71,37 @@ export class UserController {
     return user;
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Patch('me/avatar')
-  @UseInterceptors(FileInterceptor('file')) // 'file' is the field name from the frontend
+  @Post('me/avatar')
+  @UseGuards(JwtAuthGuard) // CHANGE: Add the authentication guard to protect the route
+  @UseInterceptors(FileInterceptor('file')) // The field name must match the frontend
   async uploadAvatar(
-    @Req() req: JwtAuthRequest,
     @UploadedFile(new ImageValidationPipe()) file: MulterFile,
+    @Req() req: JwtAuthRequest, // Use the properly typed request
   ) {
-    // 1. Upload the file to a specific folder, like 'avatars'
-    const result = await this.cloudinaryService.uploadFile(file, 'avatars');
+    if (!file) {
+      throw new BadRequestException('No file provided.');
+    }
 
-    // 2. Update the user in the database with the new URLs
+    // CHANGE: Use req.user.userId to match the JWT payload interface
     const userId = req.user.userId;
-    return this.userService.updateAvatar(userId, result.secure_url, result.public_id);
-  }
 
+    const result = await this.cloudinaryService.uploadFile(file, `avatars/${userId}`, {
+      transformation: [{ width: 200, height: 200, crop: 'fill' }],
+    });
+
+    // Update the user's avatar URL in the database
+    const updatedUser = await this.userService.updateAvatar(
+      userId,
+      result.secure_url,
+      result.public_id,
+    );
+
+    return {
+      message: 'Avatar uploaded successfully',
+      url: result.secure_url,
+      user: updatedUser,
+    };
+  }
   @UseGuards(JwtAuthGuard)
   @Get('me/stats')
   async updateStatsAndRating(@Req() req: JwtAuthRequest) {
