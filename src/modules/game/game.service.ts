@@ -124,25 +124,41 @@ export class GameService {
       `emition de l'evennement apres un coup jouer gameId ${game._id} nextPlayerId: ${game.turn}`,
     );
 
+    // ✅ NOUVEAU: Après chaque coup, vérifier si la partie est terminée
+    if (chess.isGameOver()) {
+      await this._handleGameOver(game, chess, applied);
+      return { move: moveDoc.toObject(), game: game.toObject() };
+    }
+
     // Vérifier si AI doit jouer
     if (game.turn === 'AI') await this._handleAiTurn(gameId, game);
 
-    // Vérifier si la partie est terminée
-    if (chess.isGameOver()) await this._handleGameOver(game, chess, applied);
+    // // Vérifier si la partie est terminée
+    // if (chess.isGameOver()) await this._handleGameOver(game, chess, applied);
 
     return { move: moveDoc.toObject(), game: game.toObject() };
   }
 
   private async _handleAiTurn(gameId: string, game: any) {
     const aiMove = await this.aiService.generateMove({ gameId, difficulty: 'medium' });
-    console.log(`movement generer par l'ia ${JSON.stringify(aiMove)}}`);
+    console.log(`movement generer par✅✅ l'ia ${JSON.stringify(aiMove)}}`);
     console.log(`ia move ${JSON.stringify(aiMove)}`);
+
     if (!aiMove?.move) {
-      game.status = 'draw';
+      const chess = new Chess(game.fen as unknown as string);
+      if (chess.isCheckmate()) {
+        game.status = 'checkmate';
+      } else {
+        game.status = 'draw';
+      }
       game.endedAt = new Date();
       await game.save();
+
+      // ✅ Appeler la fonction de fin de partie
+      await this._handleGameOver(game, chess, { color: chess.turn() } as Move); // Simuler un coup pour _handleGameOver
       return;
     }
+
     const result = await this.playMove(gameId, 'AI', aiMove.move, aiMove.promotion);
     // ⚡ MAIS on émet explicitement un event IA → front
     this.eventEmitter.emit('game.aiPlayed', {
@@ -155,12 +171,13 @@ export class GameService {
   }
 
   private async _handleGameOver(game: any, chess: Chess, lastMove: Move) {
+    console.log(`appele de game over ✅✅`);
     game.endedAt = new Date();
 
     let whiteResult: 'win' | 'loss' | 'draw' = 'draw';
     let blackResult: 'win' | 'loss' | 'draw' = 'draw';
 
-    // 🔧 Gérer plusieurs cas de fin de partie
+    // Gérer les différents cas de fin de partie
     if (chess.isCheckmate()) {
       game.status = 'checkmate';
       if (lastMove.color === 'w') {
@@ -178,23 +195,40 @@ export class GameService {
       game.status = 'draw';
     }
 
-    const whitePlayer = await this.userModel.findById(game.whitePlayer);
-    const blackPlayer = await this.userModel.findById(game.blackPlayer);
+    // ✅ Vérifier si les joueurs sont des humains avant de mettre à jour les statistiques et le classement.
+    const isWhitePlayerAI = game.whitePlayer === 'AI';
+    const isBlackPlayerAI = game.blackPlayer === 'AI';
 
-    if (whitePlayer && blackPlayer) {
-      await this.userService.updateStatsAndRating(
-        String(whitePlayer._id),
-        whiteResult,
-        blackPlayer.rating,
-      );
-      await this.userService.updateStatsAndRating(
-        String(blackPlayer._id),
-        blackResult,
-        whitePlayer.rating,
-      );
+    if (!isWhitePlayerAI && !isBlackPlayerAI) {
+      const whitePlayer = await this.userModel.findById(game.whitePlayer);
+      const blackPlayer = await this.userModel.findById(game.blackPlayer);
+
+      if (whitePlayer && blackPlayer) {
+        await this.userService.updateStatsAndRating(
+          String(whitePlayer._id),
+          whiteResult,
+          blackPlayer.rating,
+        );
+        await this.userService.updateStatsAndRating(
+          String(blackPlayer._id),
+          blackResult,
+          whitePlayer.rating,
+        );
+      }
     }
 
     await game.save();
+
+    // Émettre l'événement de fin de partie
+    this.eventEmitter.emit('game.gameOver', {
+      gameId: game._id,
+      result: game.status,
+      winnerId: game.winner,
+      fen: chess.fen(),
+      pgn: chess.pgn(),
+      players: [game.whitePlayer, game.blackPlayer],
+    });
+    console.log(`appele de game over emission de game.gameOver  ✅  ✅   `);
   }
 
   /** Abandon */
@@ -210,23 +244,28 @@ export class GameService {
     game.endedAt = new Date();
     await game.save();
 
-    // 🔧 Même contre IA : enregistrer la défaite du joueur humain
-    if (playerId !== 'AI') {
+    // Mettre à jour les statistiques et le classement (si nécessaire)
+    // 💡 Correction ici : Vérifiez si le gagnant et le perdant sont des joueurs humains
+    if (playerId !== 'AI' && game.winner !== 'AI') {
+      const winner = await this.userModel.findById(game.winner);
       const loser = await this.userModel.findById(playerId);
-      const loserRating = loser?.rating || 0;
 
-      if (game.winner && game.winner !== 'AI') {
-        await this.userService.updateStatsAndRating(game.winner.toString(), 'win', loserRating);
-      }
-      if (loser) {
-        await this.userService.updateStatsAndRating(playerId, 'loss', loserRating);
+      if (winner && loser) {
+        await this.userService.updateStatsAndRating(String(winner._id), 'win', loser.rating);
+        await this.userService.updateStatsAndRating(String(loser._id), 'loss', winner.rating);
       }
     }
 
-    this.eventEmitter.emit('game.playerResigned', {
-      gameId,
+    // ✅ Appeler _handleGameOver pour déclencher l'événement final et uniforme
+    // La méthode _handleGameOver émettra l'événement 'game.gameOver'
+    const chess = new Chess(game.fen);
+    this.eventEmitter.emit('game.gameOver', {
+      gameId: game._id,
+      result: game.status,
       winnerId: game.winner,
-      playerId,
+      fen: chess.fen(),
+      pgn: chess.pgn(),
+      players: [game.whitePlayer, game.blackPlayer],
     });
 
     return game.toObject();

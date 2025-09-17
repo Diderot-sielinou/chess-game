@@ -81,6 +81,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const opponentId = payload.playerId === payload.winnerId ? null : payload.playerId;
 
     if (opponentId) {
+      console.log(`opponentId:${opponentId} ecouter de l'evenement de playerResigned generer gameId: ${payload.gameId} game :
+      ${JSON.stringify(payload)}  `);
       this.server.to(opponentId.toString()).emit('playerResigned', {
         message: `Your opponent has resigned the game.`,
         winner: payload.winnerId,
@@ -119,6 +121,42 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  @OnEvent('game.gameOver')
+  handleGameOver(payload: {
+    gameId: string;
+    result: string;
+    winnerId?: string;
+    fen: string;
+    pgn: string;
+    players: string[];
+  }) {
+    this.logger.log(`Game over event received for game ${payload.gameId}`);
+
+    const eventPayload = {
+      gameId: payload.gameId,
+      result: payload.result,
+      winner: payload.winnerId,
+      game: {
+        fen: payload.fen,
+        pgn: payload.pgn,
+        status: payload.result,
+      },
+    };
+
+    // 1. Émettre l'événement à la room de la partie (pour les spectateurs ou si le client est encore là)
+    this.server.to(payload.gameId).emit('gameOver', eventPayload);
+
+    // 2. ✅ Émettre l'événement à la room privée de chaque joueur
+    for (const playerId of payload.players) {
+      // Si l'IA n'a pas de room, cela n'aura pas d'effet, ce qui est le comportement souhaité.
+      if (playerId !== 'AI') {
+        this.server.to(String(playerId)).emit('gameOver', eventPayload);
+      }
+    }
+
+    console.log(`gameOver winner:${payload.winnerId}`);
+  }
+
   @SubscribeMessage('joinGame')
   async handleJoinGame(@MessageBody() body: { gameId: string }, @ConnectedSocket() client: Socket) {
     try {
@@ -143,24 +181,24 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const moveResult = await this.gamesService.playMove(
         body.gameId,
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        client.data.userId, // ✅ récupéré depuis le guard
+        client.data.userId, // ✅
         body.move,
         body.promotion,
       );
 
-      this.server.to(body.gameId).emit('movePlayed', moveResult);
+      // this.server.to(body.gameId).emit('movePlayed', moveResult);
 
-      const game = await this.gamesService.getGame(body.gameId);
-      if (game.status !== 'active') {
-        const result = game.status;
-        this.server.to(body.gameId).emit('gameOver', {
-          game,
-          gameId: body.gameId,
-          result: result,
-          winner: game.winner,
-          statsUpdated: true,
-        });
-      }
+      // const game = await this.gamesService.getGame(body.gameId);
+      // if (game.status !== 'active') {
+      //   const result = game.status;
+      //   this.server.to(body.gameId).emit('gameOver', {
+      //     game,
+      //     gameId: body.gameId,
+      //     result: result,
+      //     winner: game.winner,
+      //     statsUpdated: true,
+      //   });
+      // }
     } catch (error) {
       if (error instanceof HttpException) {
         client.emit('error', { status: error.getStatus(), message: error.getResponse() });
@@ -212,14 +250,36 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('joinQueue')
   async handleJoinQueue(client: Socket, payload: { timeControl: string }) {
-    const game = await this.matchmakingService.enqueue(client.id, payload.timeControl);
+    console.log('call joinQueue ✅');
+
+    // ✅  Utiliser client.data.userId
+    const game = await this.matchmakingService.enqueue(client.data.userId, payload.timeControl);
+
     if (game) {
+      console.log(`game found on joinQueue ✅ ✅ ${JSON.stringify(game)}`);
+
+      // ✅  Emettre sur les rooms des joueurs (leur userId)
       this.server.to(String(game.whitePlayer)).emit('matchFound', game);
       this.server.to(String(game.blackPlayer)).emit('matchFound', game);
     } else {
+      // ✅ : Emettre le message d'attente sur la room du joueur
       this.server
         .to(String(client.data.userId))
-        .emit('Waiting', { message: 'Waiting for another player...' });
+        .emit('waiting', { message: 'Waiting for another player...' });
+    }
+  }
+
+  @OnEvent('match.found')
+  handleMatchFound(payload: { game: any; players: string[]; isAi?: boolean }) {
+    const { game, players, isAi } = payload;
+
+    if (isAi) {
+      // Si c'est un match vs IA, on émet un événement spécifique au joueur
+      this.server.to(String(players[0])).emit('aiMatchFound', game);
+    } else {
+      // Si c'est un match humain, on émet l'événement aux deux joueurs
+      this.server.to(String(game.whitePlayer)).emit('matchFound', game);
+      this.server.to(String(game.blackPlayer)).emit('matchFound', game);
     }
   }
 
@@ -239,6 +299,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('resign')
   async handleResign(@MessageBody() body: { gameId: string }, @ConnectedSocket() client: Socket) {
+    console.log(`call resign gameId ✅ ✅ ${JSON.stringify(body)}`);
+
     try {
       const result = await this.gamesService.resign(body.gameId, client.data.userId as string);
       this.logger.log(`player ${client.data.userId} resign parti `);

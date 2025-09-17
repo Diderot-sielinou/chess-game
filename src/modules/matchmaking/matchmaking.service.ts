@@ -3,6 +3,7 @@ import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import Redis from 'ioredis';
 import { GameService } from '../game/game.service';
 import { GameGateway } from '../sockets/game.gateway';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 const QUEUE_KEY = (tc: string) => `matchmaking:queue:tc:${tc}`;
 const DEFAULT_TC = '300+0'; // ♟️ 5+0
@@ -21,6 +22,7 @@ export class MatchmakingService {
     @Inject('REDIS') private readonly redis: Redis,
     @Inject(forwardRef(() => GameService))
     private readonly gamesService: GameService,
+    private readonly eventEmitter: EventEmitter2,
     // ⚠️ on suppose que GameGateway est exporté depuis son module
     // @Inject(forwardRef(() => GameGateway))
     // private readonly gateway: GameGateway,
@@ -28,6 +30,7 @@ export class MatchmakingService {
 
   /** Joindre la file (par cadence), puis tenter un match immédiat ou fallback IA */
   async enqueue(userId: string, timeControl?: string) {
+    console.log('call enqueue');
     const tc = timeControl || DEFAULT_TC;
     const player: QueuePlayer = { userId, timeControl: tc, enqueuedAt: Date.now() };
     const key = QUEUE_KEY(tc);
@@ -42,11 +45,14 @@ export class MatchmakingService {
     // 🔎 Tenter un match immédiat
     const game = await this.tryMatch(tc);
     if (game) {
+      console.log('gane found enqueue');
+
       // 📣 Notifier chacun dans sa room privée userId
       // this.gateway.server.to(String(game.whitePlayer)).emit('matchFound', game);
       // this.gateway.server.to(String(game.blackPlayer)).emit('matchFound', game);
       return game;
     }
+    console.log('game not found enqueue');
 
     // ⛑️ Fallback IA si attente trop longue (contrôle à l’instant T)
     const fallback = await this.tryAiFallback(player);
@@ -114,6 +120,7 @@ export class MatchmakingService {
         blackPlayer: p2.userId,
         timeControl: tc,
       });
+      this.eventEmitter.emit('match.found', { game, players: [p1.userId, p2.userId] });
 
       return game;
     } catch (e) {
@@ -155,6 +162,7 @@ export class MatchmakingService {
         blackPlayer: 'AI',
         timeControl: player.timeControl,
       });
+      this.eventEmitter.emit('match.found', { game, players: [player.userId], isAi: true });
       return game;
     } catch (e) {
       await this.redis.unwatch();
