@@ -1,3 +1,4 @@
+//user/user.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -40,6 +41,40 @@ export class UserService {
 
   async findByPhone(phone: string) {
     return this.userModel.findOne({ phone }).exec();
+  }
+
+  // ✅ ADD THIS NEW METHOD
+  /**
+   * Updates a user's avatar information.
+   * @param userId The ID of the user to update.
+   * @param avatarUrl The new secure URL from Cloudinary.
+   * @param avatarPublicId The new public ID from Cloudinary.
+   * @returns The updated user document.
+   */
+  async updateAvatar(userId: string, avatarUrl: string, avatarPublicId: string) {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new NotFoundException('Invalid user ID');
+    }
+
+    const updatedUser = await this.userModel
+      .findByIdAndUpdate(
+        userId,
+        {
+          $set: {
+            avatarUrl,
+            avatarPublicId,
+          },
+        },
+        { new: true }, // This option returns the updated document
+      )
+      .select('-__v') // Exclude the version key from the returned document
+      .exec();
+
+    if (!updatedUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    return updatedUser;
   }
 
   async updateStatsAndRating(

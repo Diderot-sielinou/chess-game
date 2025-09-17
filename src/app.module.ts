@@ -1,3 +1,4 @@
+//app.module.ts
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -13,6 +14,7 @@ import { RedisModule } from './infa/redis.module';
 import { GameModule } from './modules/game/game.module';
 import { SocketsModule } from './modules/sockets/sockets.module';
 import { MatchmakingModule } from './modules/matchmaking/matchmaking.module';
+import { CloudinaryModule } from './common/cloudinary/cloudinary.module';
 
 @Module({
   imports: [
@@ -20,7 +22,7 @@ import { MatchmakingModule } from './modules/matchmaking/matchmaking.module';
       imports: [AppConfigModule],
       inject: [AppConfigService],
       useFactory: (configService: AppConfigService) => ({
-        uri: configService.LOCAL_DATABASE,
+        uri: configService.DATABASE_URL,
         serverSelectionTimeoutMS: 7000, // timeout 5s
       }),
     }),
@@ -32,6 +34,7 @@ import { MatchmakingModule } from './modules/matchmaking/matchmaking.module';
     GameModule,
     SocketsModule,
     MatchmakingModule,
+    CloudinaryModule,
   ],
   controllers: [AppController],
   providers: [AppService],
