@@ -72,24 +72,22 @@ export class UserController {
   }
 
   @Post('me/avatar')
-  @UseGuards(JwtAuthGuard) // CHANGE: Add the authentication guard to protect the route
-  @UseInterceptors(FileInterceptor('file')) // The field name must match the frontend
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
   async uploadAvatar(
     @UploadedFile(new ImageValidationPipe()) file: MulterFile,
-    @Req() req: JwtAuthRequest, // Use the properly typed request
+    @Req() req: JwtAuthRequest,
   ) {
     if (!file) {
       throw new BadRequestException('No file provided.');
     }
 
-    // CHANGE: Use req.user.userId to match the JWT payload interface
     const userId = req.user.userId;
 
     const result = await this.cloudinaryService.uploadFile(file, `avatars/${userId}`, {
       transformation: [{ width: 200, height: 200, crop: 'fill' }],
     });
 
-    // Update the user's avatar URL in the database
     const updatedUser = await this.userService.updateAvatar(
       userId,
       result.secure_url,
