@@ -10,7 +10,7 @@ export interface IGame extends Document {
   status: 'pending' | 'active' | 'checkmate' | 'stalemate' | 'draw' | 'resigned';
   fen: string;
   pgn?: string;
-  turn?: Types.ObjectId | string; // nouveau champ
+  turn?: Types.ObjectId | string;
   winner?: Types.ObjectId | string;
   moves: Types.ObjectId[];
   createdAt: Date;

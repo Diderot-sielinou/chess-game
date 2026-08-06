@@ -11,7 +11,7 @@ import { MyLoggerModule } from '../my-logger/my-logger.module';
 @Module({
   imports: [
     forwardRef(() => GameModule),
-    MatchmakingModule,
+    forwardRef(() => MatchmakingModule), // <- avec forwardRef pour gérer la circularité
     AiModule,
     MyLoggerModule,
     forwardRef(() => AuthModule), // <-- donne accès à WsAuthGuard, JwtService, MyLoggerService

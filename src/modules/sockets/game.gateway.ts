@@ -12,8 +12,11 @@ import { Server, Socket } from 'socket.io';
 import { AiService } from '../ai/ai.service';
 import { GameService } from '../game/game.service';
 import { UseGuards, HttpException } from '@nestjs/common';
-import { WsAuthGuard } from '../auth/guards/ws-auth.guard';
+// import { WsAuthGuard } from '../auth/guards/ws-auth.guard';
 import { OnEvent } from '@nestjs/event-emitter';
+import { MatchmakingService } from '../matchmaking/matchmaking.service';
+import { JwtService } from '@nestjs/jwt';
+import { MyLoggerService } from '../my-logger/my-logger.service';
 
 @WebSocketGateway({
   cors: {
@@ -24,7 +27,7 @@ import { OnEvent } from '@nestjs/event-emitter';
   // Spécifier explicitement les transports pour éviter le "socket hang up"
   transports: ['websocket', 'polling'],
 })
-@UseGuards(WsAuthGuard) // ✅
+// @UseGuards(WsAuthGuard) // ✅
 export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
@@ -32,21 +35,38 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly gamesService: GameService,
     private readonly aiService: AiService,
+    private readonly matchmakingService: MatchmakingService,
+    private readonly jwtService: JwtService,
+    private readonly logger: MyLoggerService,
   ) {}
 
   // ✅ Quand un joueur se connecte
-  handleConnection(@ConnectedSocket() client: Socket) {
-    // 🔐 Ton WsAuthGuard met normalement userId dans client.data.userId
-    console.log(`Client connected: ${client.id}, userId: ${client.data.userId}`);
+  // ✅ Validation JWT directement dans handleConnection
+  async handleConnection(@ConnectedSocket() client: Socket) {
+    const token = client.handshake.auth?.token;
+    if (!token) {
+      this.logger.log('Token manquant, déconnexion...');
+      client.disconnect(true);
+      return;
+    }
 
-    // ✅ Room privée par utilisateur : permet d’émettre à un joueur précis
-    if (client.data?.userId) {
-      void client.join(String(client.data.userId));
+    try {
+      const payload: any = this.jwtService.verify(token as string);
+      client.data.userId = payload.sub;
+      client.data.username = payload.name;
+      this.logger.log(`Client connecté: ${client.id}, userId: ${client.data.userId}`);
+
+      // Room privée par utilisateur
+      await client.join(String(client.data.userId));
+      this.logger.log(`Client rejoint room privée: ${client.data.userId}`);
+    } catch (err) {
+      this.logger.error('Token invalide, déconnexion...');
+      client.disconnect(true);
     }
   }
 
   handleDisconnect(@ConnectedSocket() client: Socket) {
-    console.log(`Client disconnected: ${client.id}, userId: ${client.data.userId}`);
+    this.logger.log(`Client disconnected: ${client.id}, userId: ${client.data.userId}`);
     const rooms = Array.from(client.rooms).filter((r) => r !== client.id);
     rooms.forEach((gameId) => {
       this.server.to(gameId).emit('playerDisconnected', {
@@ -61,6 +81,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const opponentId = payload.playerId === payload.winnerId ? null : payload.playerId;
 
     if (opponentId) {
+      console.log(`opponentId:${opponentId} ecouter de l'evenement de playerResigned generer gameId: ${payload.gameId} game :
+      ${JSON.stringify(payload)}  `);
       this.server.to(opponentId.toString()).emit('playerResigned', {
         message: `Your opponent has resigned the game.`,
         winner: payload.winnerId,
@@ -71,6 +93,14 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @OnEvent('game.nextTurn')
   handleNextTurn(payload: { gameId: string; nextPlayerId: string; lastMove: any; game: any }) {
+    this.logger.log(`ecouter de l'evenement de playmove generer gameId: ${payload.gameId} game :
+      ${JSON.stringify(payload.game)}  `);
+
+    if (payload.nextPlayerId === 'AI') {
+      this.logger.log(`C'est au tour de l'IA, pas besoin d'envoyer yourTurn`);
+      return;
+    }
+
     this.server.to(payload.nextPlayerId.toString()).emit('yourTurn', {
       gameId: payload.gameId,
       lastMove: payload.lastMove,
@@ -79,9 +109,58 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  @OnEvent('game.aiPlayed')
+  handleAiPlayed(payload: { gameId: string; lastMove: any; game: any }) {
+    this.logger.log(`IA a joué dans game ${payload.gameId} -> ${JSON.stringify(payload.lastMove)}`);
+
+    // Diffuser le coup joué par l'IA à tous les joueurs de la partie
+    this.server.to(payload.gameId.toString()).emit('aiMovePlayed', {
+      gameId: payload.gameId,
+      lastMove: payload.lastMove,
+      game: payload.game,
+    });
+  }
+
+  @OnEvent('game.gameOver')
+  handleGameOver(payload: {
+    gameId: string;
+    result: string;
+    winnerId?: string;
+    fen: string;
+    pgn: string;
+    players: string[];
+  }) {
+    this.logger.log(`Game over event received for game ${payload.gameId}`);
+
+    const eventPayload = {
+      gameId: payload.gameId,
+      result: payload.result,
+      winner: payload.winnerId,
+      game: {
+        fen: payload.fen,
+        pgn: payload.pgn,
+        status: payload.result,
+      },
+    };
+
+    // 1. Émettre l'événement à la room de la partie (pour les spectateurs ou si le client est encore là)
+    this.server.to(payload.gameId).emit('gameOver', eventPayload);
+
+    // 2. ✅ Émettre l'événement à la room privée de chaque joueur
+    for (const playerId of payload.players) {
+      // Si l'IA n'a pas de room, cela n'aura pas d'effet, ce qui est le comportement souhaité.
+      if (playerId !== 'AI') {
+        this.server.to(String(playerId)).emit('gameOver', eventPayload);
+      }
+    }
+
+    console.log(`gameOver winner:${payload.winnerId}`);
+  }
+
   @SubscribeMessage('joinGame')
   async handleJoinGame(@MessageBody() body: { gameId: string }, @ConnectedSocket() client: Socket) {
     try {
+      this.logger.log('user joinGame', body.gameId);
       await client.join(body.gameId);
       client.emit('joined', {
         message: `You have joined the game as ${client.data.userId}.`,
@@ -102,23 +181,24 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const moveResult = await this.gamesService.playMove(
         body.gameId,
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        client.data.userId, // ✅ récupéré depuis le guard
+        client.data.userId, // ✅
         body.move,
         body.promotion,
       );
 
-      this.server.to(body.gameId).emit('movePlayed', moveResult);
+      // this.server.to(body.gameId).emit('movePlayed', moveResult);
 
-      const game = await this.gamesService.getGame(body.gameId);
-      if (game.status !== 'active') {
-        const result = game.status;
-        this.server.to(body.gameId).emit('gameOver', {
-          gameId: body.gameId,
-          result: result,
-          winner: game.winner,
-          statsUpdated: true,
-        });
-      }
+      // const game = await this.gamesService.getGame(body.gameId);
+      // if (game.status !== 'active') {
+      //   const result = game.status;
+      //   this.server.to(body.gameId).emit('gameOver', {
+      //     game,
+      //     gameId: body.gameId,
+      //     result: result,
+      //     winner: game.winner,
+      //     statsUpdated: true,
+      //   });
+      // }
     } catch (error) {
       if (error instanceof HttpException) {
         client.emit('error', { status: error.getStatus(), message: error.getResponse() });
@@ -140,6 +220,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         client.emit('error', { message: 'Game not found.' });
         return;
       }
+      this.logger.log(`demande de suggestion au backend ${JSON.stringify(game)}`);
 
       const isWhitePlayer = String(game.whitePlayer) === client.data.userId;
       const isBlackPlayer = String(game.blackPlayer) === client.data.userId;
@@ -156,12 +237,76 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       };
 
       const suggestions = await this.aiService.suggestMoves(suggestionDto);
+      this.logger.log(`reponse du backend de suggestion ${JSON.stringify(suggestions)}`);
+
       client.emit('suggestionReceived', { suggestions });
     } catch (error) {
       console.error('Error when requesting suggestion:', error);
       client.emit('error', {
         message: 'An error occurred when requesting suggestion.',
       });
+    }
+  }
+
+  @SubscribeMessage('joinQueue')
+  async handleJoinQueue(client: Socket, payload: { timeControl: string }) {
+    console.log('call joinQueue ✅');
+
+    // ✅  Utiliser client.data.userId
+    const game = await this.matchmakingService.enqueue(client.data.userId, payload.timeControl);
+
+    if (game) {
+      console.log(`game found on joinQueue ✅ ✅ ${JSON.stringify(game)}`);
+
+      // ✅  Emettre sur les rooms des joueurs (leur userId)
+      this.server.to(String(game.whitePlayer)).emit('matchFound', game);
+      this.server.to(String(game.blackPlayer)).emit('matchFound', game);
+    } else {
+      // ✅ : Emettre le message d'attente sur la room du joueur
+      this.server
+        .to(String(client.data.userId))
+        .emit('waiting', { message: 'Waiting for another player...' });
+    }
+  }
+
+  @OnEvent('match.found')
+  handleMatchFound(payload: { game: any; players: string[]; isAi?: boolean }) {
+    const { game, players, isAi } = payload;
+
+    if (isAi) {
+      // Si c'est un match vs IA, on émet un événement spécifique au joueur
+      this.server.to(String(players[0])).emit('aiMatchFound', game);
+    } else {
+      // Si c'est un match humain, on émet l'événement aux deux joueurs
+      this.server.to(String(game.whitePlayer)).emit('matchFound', game);
+      this.server.to(String(game.blackPlayer)).emit('matchFound', game);
+    }
+  }
+
+  @SubscribeMessage('createVsAI')
+  async handleCreateVsAI(client: Socket, payload: { timeControl: string }) {
+    this.logger.log(`partir contre l'ia creer par socket`);
+    const game = await this.gamesService.createGame({
+      whitePlayer: client.data.userId,
+      blackPlayer: 'AI',
+      timeControl: payload.timeControl,
+    });
+    this.logger.log(`partir contre l'ia creer par socket ${JSON.stringify(game)}`);
+
+    // client.join(game._id.toString());
+    client.emit('aiGameCreated', game);
+  }
+
+  @SubscribeMessage('resign')
+  async handleResign(@MessageBody() body: { gameId: string }, @ConnectedSocket() client: Socket) {
+    console.log(`call resign gameId ✅ ✅ ${JSON.stringify(body)}`);
+
+    try {
+      const result = await this.gamesService.resign(body.gameId, client.data.userId as string);
+      this.logger.log(`player ${client.data.userId} resign parti `);
+    } catch (error) {
+      console.error('Error resigning game:', error);
+      client.emit('error', { message: 'An error occurred while resigning the game.' });
     }
   }
 }

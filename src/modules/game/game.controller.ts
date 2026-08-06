@@ -51,12 +51,13 @@ export class GameController {
   @Post('move')
   async playMove(@Request() req, @Body() dto: PlayMoveDto) {
     const playerId = req.user.userId; // ID du joueur extrait du jeton
+    console.log(`coup du front ${dto.move}`);
 
     return this.gamesService.playMove(dto.gameId, playerId as string, dto.move, dto.promotion);
   }
 
-  @Get(':id/last-moves')
-  async lastMoves(@Param('id') id: string) {
-    return this.gamesService.getLastMoves(id, 10);
-  }
+  // @Get(':id/last-moves')
+  // async lastMoves(@Param('id') id: string) {
+  //   return this.gamesService.getLastMoves(id, 10);
+  // }
 }

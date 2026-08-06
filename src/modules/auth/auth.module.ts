@@ -14,7 +14,7 @@ import { EmailModule } from 'src/email/email.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { UserModule } from '../user/user.module';
-import { WsAuthGuard } from './guards/ws-auth.guard';
+// import { WsAuthGuard } from './guards/ws-auth.guard';
 
 @Module({
   imports: [
@@ -35,8 +35,8 @@ import { WsAuthGuard } from './guards/ws-auth.guard';
     AppConfigModule,
     forwardRef(() => UserModule), // <-- ici
   ],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard, WsAuthGuard],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard],
   controllers: [AuthController],
-  exports: [AuthService, JwtAuthGuard, WsAuthGuard, JwtModule],
+  exports: [AuthService, JwtAuthGuard, JwtModule],
 })
 export class AuthModule {}
